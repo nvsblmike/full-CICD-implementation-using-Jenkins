@@ -357,6 +357,7 @@ resource "aws_instance" "k8s_master" {
   }
 }
 
+
 resource "aws_instance" "k8s_worker" {
   count = 2
   ami                    = data.aws_ami.ubuntu.id
