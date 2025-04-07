@@ -1,0 +1,28 @@
+.ssh
+# Ignore Terraform state files
+terraform.tfstate
+terraform.tfstate.backup
+
+# Ignore Terraform cache and logs
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Ignore Terraform variable files that may contain secrets
+*.tfvars
+*.tfvars.json
+
+node_modules
+
+.ssh/
+*.pem
+*.key
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+vpn-cert/
