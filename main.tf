@@ -123,6 +123,7 @@ resource "aws_security_group" "sonarqube_sg" {
     to_port         = 22
     protocol        = "tcp"
     security_groups = [aws_security_group.ansible_sg.id]
+    # cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -333,7 +334,7 @@ resource "aws_instance" "sonarqube" {
   }
 
   tags = {
-    Name = "Sonarqube"
+    Name = "Sonarquber"
   }
 }
 
@@ -451,7 +452,7 @@ resource "aws_instance" "ansible_controller" {
 
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["amazon"] # Canonical's AWS account ID
+  owners      = ["099720109477"] # Canonical's AWS account ID
 
   filter {
     name   = "name"

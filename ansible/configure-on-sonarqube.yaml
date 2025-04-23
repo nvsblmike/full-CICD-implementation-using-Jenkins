@@ -3,13 +3,15 @@
   hosts: sonarqube
   become: true
 
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
   tasks:
     # Update the package manager repositories
     - name: Update apt repositories
       apt:
         update_cache: yes
         cache_valid_time: 3600
-
 
     # Install required dependencies
     - name: Install ca-certificates, curl, and other dependencies
@@ -40,13 +42,14 @@
         path: /etc/apt/keyrings/docker.asc
         mode: '0644'
 
-    # Add Docker repository to apt sources with fixed repository URL
+    # Add Docker repository to apt sources
     - name: Add Docker APT repository
       shell: |
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-        https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" \
         > /etc/apt/sources.list.d/docker.list
 
+    # Update apt packages again
     - name: Update apt packages after adding Docker repo
       apt:
         update_cache: yes
@@ -62,12 +65,24 @@
           - docker-compose-plugin
         state: present
 
-    # Start Docker service
+    # Start and enable Docker
     - name: Ensure Docker is started and enabled
       service:
         name: docker
         state: started
         enabled: yes
+
+    # Install pip3 (required for installing Python docker SDK)
+    - name: Ensure pip3 is installed
+      apt:
+        name: python3-pip
+        state: present
+
+    # Install Docker SDK for Python
+    - name: Install Docker Python SDK
+      pip:
+        name: docker
+        executable: pip3
 
     # Run SonarQube Docker container
     - name: Run SonarQube Docker container
@@ -79,15 +94,15 @@
         ports:
           - "9000:9000"
 
-    # Wait for SonarQube to start (optional but recommended)
+    # Wait for SonarQube to be up
     - name: Wait for SonarQube to start
       wait_for:
-        host: "{{ ansible_host }}"
+        host: "{{ansible_host}}"
         port: 9000
         state: started
         timeout: 300
 
-    # Display success message
+    # Print success message
     - name: Display SonarQube access URL
       debug:
-        msg: "SonarQube is up and running at http://{{ ansible_host }}:9000"
+        msg: "SonarQube is up and running at http://{{ansible_host}}:9000"
