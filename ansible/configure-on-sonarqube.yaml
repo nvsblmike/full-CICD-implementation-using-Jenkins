@@ -1,61 +1,63 @@
 ---
-- name: Install and Configure SonarQube
+- name: Clean install Docker and run SonarQube container
   hosts: sonarqube
   become: true
 
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-
   tasks:
-    # Update the package manager repositories
-    - name: Update apt repositories
+
+    - name: Remove all lines mentioning download.docker.com in /etc/apt/sources.list
+      lineinfile:
+        path: /etc/apt/sources.list
+        regexp: '^.*download\.docker\.com.*$'
+        state: absent
+
+    - name: Remove all rogue docker source files
+      shell: |
+        find /etc/apt/sources.list.d/ -type f -name "*docker*.list" -exec rm -f {} +
+      args:
+        executable: /bin/bash
+
+    - name: Remove old Docker GPG key if it exists
+      file:
+        path: /etc/apt/keyrings/docker.asc
+        state: absent
+
+    - name: Update apt cache after cleanup
       apt:
         update_cache: yes
-        cache_valid_time: 3600
 
-    # Install required dependencies
-    - name: Install ca-certificates, curl, and other dependencies
+    - name: Install required packages
       apt:
         name:
           - ca-certificates
           - curl
+          - gnupg
+          - lsb-release
         state: present
-        update_cache: yes
 
-    # Create directory for Docker GPG key
-    - name: Create directory for Docker GPG key
+    - name: Create directory for Docker keyring
       file:
         path: /etc/apt/keyrings
         state: directory
         mode: '0755'
 
-    # Download Docker's GPG key
-    - name: Download Docker's GPG key
+    - name: Download Docker GPG key
       get_url:
         url: https://download.docker.com/linux/ubuntu/gpg
         dest: /etc/apt/keyrings/docker.asc
         mode: '0644'
 
-    # Ensure proper permissions for the key
-    - name: Set permissions for the Docker GPG key
-      file:
-        path: /etc/apt/keyrings/docker.asc
-        mode: '0644'
+    - name: Add Docker repository cleanly with signed-by
+      copy:
+        dest: /etc/apt/sources.list.d/docker.list
+        content: |
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release | lower }} stable
 
-    # Add Docker repository to apt sources
-    - name: Add Docker APT repository
-      shell: |
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-        https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" \
-        > /etc/apt/sources.list.d/docker.list
-
-    # Update apt packages again
-    - name: Update apt packages after adding Docker repo
+    - name: Update apt cache after adding Docker repo
       apt:
         update_cache: yes
 
-    # Install Docker and Docker Compose
-    - name: Install Docker CE, Docker CLI, and Docker Compose
+    - name: Install Docker Engine and tools
       apt:
         name:
           - docker-ce
@@ -65,44 +67,26 @@
           - docker-compose-plugin
         state: present
 
-    # Start and enable Docker
-    - name: Ensure Docker is started and enabled
+    - name: Ensure Docker service is running
       service:
         name: docker
         state: started
-        enabled: yes
+        enabled: true
 
-    # Install pip3 (required for installing Python docker SDK)
-    - name: Ensure pip3 is installed
+    - name: Install pip for Python 3
       apt:
         name: python3-pip
         state: present
 
-    # Install Docker SDK for Python
-    - name: Install Docker Python SDK
+    - name: Install Docker SDK for Python
       pip:
         name: docker
-        executable: pip3
 
-    # Run SonarQube Docker container
-    - name: Run SonarQube Docker container
-      docker_container:
+    - name: Run SonarQube container
+      community.docker.docker_container:
         name: sonar
         image: sonarqube:lts-community
         state: started
-        restart_policy: always
-        ports:
+        restart_policy: unless-stopped
+        published_ports:
           - "9000:9000"
-
-    # Wait for SonarQube to be up
-    - name: Wait for SonarQube to start
-      wait_for:
-        host: "{{ansible_host}}"
-        port: 9000
-        state: started
-        timeout: 300
-
-    # Print success message
-    - name: Display SonarQube access URL
-      debug:
-        msg: "SonarQube is up and running at http://{{ansible_host}}:9000"
